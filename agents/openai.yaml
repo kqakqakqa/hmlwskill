@@ -1,0 +1,4 @@
+interface:
+  display_name: "Huawei Lite Wearable / 华为轻智能手表"
+  short_description: "Lite Wearable memory, HML, resources, audio / 低内存开发规范"
+  default_prompt: "Use $huawei-lite-watch-development to develop or review this Lite Wearable project under strict HML, JavaScript, memory, resource, audio, and real-device constraints."

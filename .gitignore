@@ -1,0 +1,13 @@
+*.zip
+*.hap
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+build/
+.preview/
+.hvigor/
+node_modules/
+oh_modules/
+
