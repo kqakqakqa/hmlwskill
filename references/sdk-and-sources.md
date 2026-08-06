@@ -43,6 +43,7 @@ rg -n "liteWearableTag|liteCommonTag" "<DevEco-SDK>\default\openharmony\js\build
 
 本公开仓库不再分发厂商原始文档、SDK 文件、设备截图或第三方案例指南。让用户从合法渠道提供或访问：
 
+- 华为官方 [ArkUI JS 完整组件参考](https://developer.huawei.com/consumer/cn/doc/harmonyos-references/arkui-js-full-comp)，用于查组件细节；仍需用 Lite SDK 白名单过滤。
 - 当前版本 Lite Wearable 开发文档。
 - 对应 API 版本的 `@system.*` / `@ohos.*` 声明。
 - 目标设备、固件和 WearEngine 信息。
@@ -64,7 +65,7 @@ rg -n "liteWearableTag|liteCommonTag" "<DevEco-SDK>\default\openharmony\js\build
 
 1. 从项目 `config.json` 确定 `liteWearable`、Ability 名和页面清单。
 2. 从源码 import 确定实际模块。
-3. 在当前 SDK `*.d.ts` 中查 `@since`、`@deprecated`、`@syscap`、权限及 Lite 注释。
-4. 在用户合法提供的官方资料中查 Lite Wearable 行为差异和旧 API 路径。
+3. 在当前 SDK `*.d.ts` 中查 `@since`、`@deprecated`、`@syscap`、权限及 Lite 注释。JS FA 工程优先核对实际 `@system.*` 默认导入，不把网页中的 ArkTS/kit 导入直接替换进去。
+4. 在官方组件参考和用户合法提供的官方资料中查完整语义，再用 Lite 白名单、工程模型和设备行为缩小范围。
 5. 在同类真机案例中寻找实现，但重新评估内存、资源和清理。
 6. 若 SDK、资料和案例冲突，明确记录并以目标真机决定。

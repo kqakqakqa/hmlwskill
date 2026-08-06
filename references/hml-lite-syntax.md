@@ -19,9 +19,10 @@ HML 不是 HTML，也不是 Vue、React JSX、ArkUI 或完整 OpenHarmony ArkUI�
 
 - `<DevEco-SDK>/default/openharmony/js/build-tools/ace-loader/lib/templater/lite_component_map.js`
 - 同目录 `component_validator.js`
+- 华为官方 [ArkUI JS 完整组件参考](https://developer.huawei.com/consumer/cn/doc/harmonyos-references/arkui-js-full-comp)
 - 官方 Lite Wearable 开发文档的“HML语法参考”（需用户自行合法获取）
 
-若项目的 SDK 版本不同，先读取该 SDK 的同名文件。自定义组件标签需在项目中找到真实定义和注册，不能因“像组件名”就放行。
+完整组件参考用于查询标签的完整属性、事件和用法，不是 Lite Wearable 白名单。若项目的 SDK 版本不同，先读取该 SDK 的同名文件并用它缩小范围。自定义组件标签需在项目中找到真实定义和注册，不能因“像组件名”或官方完整组件页中存在就放行。官方网页若因登录、地区或反爬限制无法读取，明确说明并使用本地 SDK，不得猜测。
 
 ## 内置标签
 

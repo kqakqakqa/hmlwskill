@@ -216,6 +216,7 @@ foreach ($file in @($jsFiles | Where-Object { $_.Length -ge $largeJsThreshold } 
 }
 
 $combined = ($jsFiles | ForEach-Object { Get-Content -Raw -LiteralPath $_.FullName }) -join "`n"
+$configText = ($liteConfigs | ForEach-Object { Get-Content -Raw -LiteralPath $_.FullName }) -join "`n"
 
 Write-Output '--- JavaScript source syntax ---'
 $documentedSyntax = @(
@@ -255,6 +256,74 @@ $unsubscribes = [regex]::Matches($combined, '\.unsubscribe[A-Za-z0-9_]*\s*\(').C
 if ($subscribes -gt 0) {
     $level = if ($unsubscribes -eq 0) { 'WARN' } else { 'INFO' }
     Write-Finding $level ('Subscriptions: subscribe calls={0}, unsubscribe calls={1}.' -f $subscribes, $unsubscribes)
+}
+
+Write-Output '--- Sensors and vibration ---'
+$sensorDefinitions = @(
+    @{ Name = 'Accelerometer'; Since = 3; Permission = 'ohos.permission.ACCELEROMETER'; Interval = $true; LiteNoEffect = $false },
+    @{ Name = 'Compass'; Since = 3; Permission = ''; Interval = $false; LiteNoEffect = $false },
+    @{ Name = 'Proximity'; Since = 3; Permission = ''; Interval = $false; LiteNoEffect = $true },
+    @{ Name = 'Light'; Since = 3; Permission = ''; Interval = $false; LiteNoEffect = $true },
+    @{ Name = 'StepCounter'; Since = 3; Permission = 'ohos.permission.ACTIVITY_MOTION'; Interval = $false; LiteNoEffect = $false },
+    @{ Name = 'Barometer'; Since = 3; Permission = ''; Interval = $false; LiteNoEffect = $false },
+    @{ Name = 'HeartRate'; Since = 3; Permission = 'ohos.permission.READ_HEALTH_DATA'; Interval = $false; LiteNoEffect = $false },
+    @{ Name = 'OnBodyState'; Since = 3; Permission = ''; Interval = $false; LiteNoEffect = $false },
+    @{ Name = 'DeviceOrientation'; Since = 6; Permission = ''; Interval = $true; LiteNoEffect = $true },
+    @{ Name = 'Gyroscope'; Since = 6; Permission = 'ohos.permission.GYROSCOPE'; Interval = $true; LiteNoEffect = $false }
+)
+$usesSensorApi = $combined -match '[''"]@system\.sensor[''"]'
+foreach ($definition in $sensorDefinitions) {
+    $subscribePattern = '\.subscribe' + $definition.Name + '\s*\('
+    $unsubscribePattern = '\.unsubscribe' + $definition.Name + '\s*\('
+    $subscribeCount = [regex]::Matches($combined, $subscribePattern).Count
+    if ($subscribeCount -eq 0) { continue }
+    $usesSensorApi = $true
+    $unsubscribeCount = [regex]::Matches($combined, $unsubscribePattern).Count
+    Write-Finding 'INFO' ('Sensor {0}: subscribe={1}, unsubscribe={2}, minimum API={3}.' -f $definition.Name, $subscribeCount, $unsubscribeCount, $definition.Since)
+    if ($unsubscribeCount -eq 0) {
+        Write-Finding 'WARN' ('subscribe{0} has no matching unsubscribe{0} call.' -f $definition.Name)
+    }
+    if ($TargetApi -lt $definition.Since) {
+        Write-Finding 'WARN' ('subscribe{0} requires API {1}, above target API {2}.' -f $definition.Name, $definition.Since, $TargetApi)
+    }
+    if ($definition.Permission -and $configText -notmatch ([regex]::Escape($definition.Permission))) {
+        Write-Finding 'WARN' ('subscribe{0} is used but permission {1} was not found in Lite config.' -f $definition.Name, $definition.Permission)
+    }
+    if ($definition.LiteNoEffect) {
+        Write-Finding 'WARN' ('subscribe{0} is documented as having no effect on Lite Wearable; do not depend on it without model-specific device evidence.' -f $definition.Name)
+    }
+}
+if ($usesSensorApi) {
+    Write-Finding 'WARN' 'REAL-DEVICE REQUIRED: simulator output cannot prove sensor hardware, units, axis direction, permissions, power, or sampling behavior.'
+    if ($combined -notmatch '\bonDestroy\s*[:(]') {
+        Write-Finding 'WARN' '@system.sensor is used without a visible onDestroy lifecycle cleanup.'
+    }
+    foreach ($match in [regex]::Matches($combined, '\binterval\s*:\s*[''"](game|ui|normal)[''"]')) {
+        $interval = $match.Groups[1].Value
+        if ($interval -eq 'game') {
+            Write-Finding 'WARN' 'Sensor interval game (~20 ms) detected; justify it and verify heap, UI throttling, power, and heat on device.'
+        } elseif ($interval -eq 'ui') {
+            Write-Finding 'INFO' 'Sensor interval ui (~60 ms) detected; keep UI updates and allocations throttled.'
+        }
+    }
+    if ($combined -match '\.subscribeHeartRate\s*\(') {
+        Write-Finding 'INFO' 'Heart-rate values require invalid-value handling; Lite SDK declarations may use 255 as an invalid reading.'
+    }
+    if ($combined -match '\.subscribeBarometer\s*\(') {
+        Write-Finding 'INFO' 'Barometer pressure unit differs across available declarations; verify magnitude and unit on the target SDK/device.'
+    }
+}
+
+$usesVibratorApi = $combined -match '[''"]@system\.vibrator[''"]' -or $combined -match '\.vibrate\s*\('
+if ($usesVibratorApi) {
+    if ($TargetApi -lt 3) { Write-Finding 'WARN' '@system.vibrator requires API 3 or later.' }
+    if ($configText -notmatch 'ohos\.permission\.VIBRATE') { Write-Finding 'WARN' '@system.vibrator is used but permission ohos.permission.VIBRATE was not found in Lite config.' }
+    foreach ($match in [regex]::Matches($combined, '\bmode\s*:\s*[''"]([^''"]+)[''"]')) {
+        if (@('short', 'long') -notcontains $match.Groups[1].Value) {
+            Write-Finding 'WARN' ('Unsupported vibrator mode literal: {0}; Lite modes are short and long.' -f $match.Groups[1].Value)
+        }
+    }
+    Write-Finding 'WARN' 'REAL-DEVICE REQUIRED: simulator output cannot prove vibration permission, duration, intensity, or system-policy behavior.'
 }
 
 if ($BuiltJsPath) {
@@ -465,13 +534,13 @@ $dynamicCommonRefs = 0
 foreach ($file in $resourceFiles) {
     $resourceText = Get-Content -Raw -LiteralPath $file.FullName
     if ($null -eq $resourceText) { $resourceText = '' }
-    foreach ($pathMatch in [regex]::Matches($resourceText, '/common/[^''"\s)<>]+')) {
+    foreach ($pathMatch in [regex]::Matches($resourceText, '(?<!\.)/common/[^''"\s)<>]+')) {
         if ($pathMatch.Value -match '[^\x00-\x7F]') {
             Write-Finding 'WARN' ('RELEASE BLOCKER: /common image reference contains non-ASCII characters at {0}:{1}: {2}' -f $file.FullName, (Get-LineNumber $resourceText $pathMatch.Index), $pathMatch.Value)
         }
     }
-    $dynamicCommonRefs += [regex]::Matches($resourceText, '/common/[^''"\s)]*{{').Count
-    foreach ($match in [regex]::Matches($resourceText, '/common/[A-Za-z0-9_.\-/]+')) {
+    $dynamicCommonRefs += [regex]::Matches($resourceText, '(?<!\.)/common/[^''"\s)]*{{').Count
+    foreach ($match in [regex]::Matches($resourceText, '(?<!\.)/common/[A-Za-z0-9_.\-/]+')) {
         $reference = $match.Value.TrimEnd('/', '.', ',')
         $suffixLength = [Math]::Min(40, $resourceText.Length - ($match.Index + $match.Length))
         $suffix = if ($suffixLength -gt 0) { $resourceText.Substring($match.Index + $match.Length, $suffixLength) } else { '' }
@@ -502,7 +571,14 @@ foreach ($file in $jsFiles) {
 }
 
 $allResourceText = ($resourceFiles | ForEach-Object { Get-Content -Raw -LiteralPath $_.FullName }) -join "`n"
-$usesFileApi = $combined -match '[''"]@system\.file[''"]' -or $combined -match '\bfile\.(access|list|get|readText|writeText|copy|move|delete|mkdir|rmdir)\s*\('
+$fileLocals = @('file')
+foreach ($match in [regex]::Matches($combined, 'import\s+([A-Za-z_$][A-Za-z0-9_$]*)\s+from\s+[''"]@system\.file[''"]')) {
+    $fileLocals += $match.Groups[1].Value
+}
+$fileLocals = @($fileLocals | Sort-Object -Unique)
+$fileLocalPattern = '(?:' + (($fileLocals | ForEach-Object { [regex]::Escape($_) }) -join '|') + ')'
+$fileCallPrefix = '\b' + $fileLocalPattern + '\.'
+$usesFileApi = $combined -match '[''"]@system\.file[''"]' -or $combined -match ($fileCallPrefix + '(access|list|get|readText|readArrayBuffer|writeText|writeArrayBuffer|copy|move|delete|mkdir|rmdir)\s*\(')
 $usesRawUri = $allResourceText -match 'internal://app/rawfile/'
 $rawImageFiles = @($imageFiles | Where-Object { $_.FullName -match '\\resources\\rawfile\\' })
 if ($rawFiles.Count -gt 0) { Write-Finding 'INFO' ('rawfile packaged resources: {0} file(s). Treat the packaged area as read-only.' -f $rawFiles.Count) }
@@ -511,11 +587,60 @@ if ($usesFileApi -or $usesRawUri -or $rawImageFiles.Count -gt 0) {
 }
 if ($usesRawUri) { Write-Finding 'INFO' 'internal://app/rawfile URI detected; verify packaged path, read/copy result, and failure recovery on a signed target device.' }
 if ($rawImageFiles.Count -gt 0) { Write-Finding 'WARN' ('Images stored in rawfile: {0}. Package and test their file-path/copy/render flow on a real device; preview is not evidence.' -f $rawImageFiles.Count) }
+if ($usesFileApi) {
+    Write-Output '--- File and storage API ---'
+    foreach ($operation in @('move', 'copy', 'list', 'get', 'delete', 'writeText', 'writeArrayBuffer', 'readText', 'readArrayBuffer', 'access', 'mkdir', 'rmdir')) {
+        $count = [regex]::Matches($combined, ($fileCallPrefix + $operation + '\s*\(')).Count
+        if ($count -gt 0) { Write-Finding 'INFO' ('file.{0}: {1} call(s).' -f $operation, $count) }
+    }
+    foreach ($match in [regex]::Matches($combined, ('(?s)' + $fileCallPrefix + '(writeText|writeArrayBuffer|delete|rmdir)\s*\(\s*\{.{0,800}?internal://app/rawfile/'))) {
+        Write-Finding 'WARN' ('Packaged rawfile is read-only; file.{0} must not target internal://app/rawfile/.' -f $match.Groups[1].Value)
+    }
+    foreach ($match in [regex]::Matches($combined, ('(?s)' + $fileCallPrefix + 'move\s*\(\s*\{.{0,800}?dstUri\s*:\s*[''"]internal://app/rawfile/'))) {
+        Write-Finding 'WARN' 'file.move must not use internal://app/rawfile/ as dstUri.'
+    }
+    if ($combined -match ($fileCallPrefix + '(writeText|writeArrayBuffer|copy|move)\s*\(') -and $combined -notmatch ($fileCallPrefix + 'mkdir\s*\(')) {
+        Write-Finding 'INFO' 'File write/copy/move is used without file.mkdir; prove every destination parent directory already exists.'
+    }
+    foreach ($match in [regex]::Matches($combined, ('(?s)' + $fileCallPrefix + 'readArrayBuffer\s*\(\s*\{(?<body>.{0,1200}?)\}\s*\)'))) {
+        if ($match.Groups['body'].Value -notmatch '\blength\s*:') {
+            Write-Finding 'WARN' 'file.readArrayBuffer without an explicit length can read to EOF and exhaust the JS heap.'
+        }
+    }
+    foreach ($match in [regex]::Matches($combined, ('(?s)' + $fileCallPrefix + 'get\s*\(\s*\{(?<body>.{0,1200}?)\}\s*\)'))) {
+        if ($match.Groups['body'].Value -match '\brecursive\s*:\s*true') {
+            Write-Finding 'INFO' 'file.get recursive=true can create a large subFiles tree; bound directory size and clear references.'
+        }
+    }
+    foreach ($match in [regex]::Matches($combined, ('(?s)' + $fileCallPrefix + 'rmdir\s*\(\s*\{(?<body>.{0,1200}?)\}\s*\)'))) {
+        if ($match.Groups['body'].Value -match '\brecursive\s*:\s*true') {
+            Write-Finding 'WARN' 'file.rmdir recursive=true detected; verify the URI is a fixed internal://app/ subdirectory before deletion.'
+        }
+    }
+}
+
+$storageLocals = @('storage')
+foreach ($match in [regex]::Matches($combined, 'import\s+([A-Za-z_$][A-Za-z0-9_$]*)\s+from\s+[''"]@system\.storage[''"]')) {
+    $storageLocals += $match.Groups[1].Value
+}
+$storageLocals = @($storageLocals | Sort-Object -Unique)
+$storageLocalPattern = '(?:' + (($storageLocals | ForEach-Object { [regex]::Escape($_) }) -join '|') + ')'
+$storageCallPrefix = '\b' + $storageLocalPattern + '\.'
+$usesStorageApi = $combined -match '[''"]@system\.storage[''"]' -or $combined -match ($storageCallPrefix + '(get|set|clear|delete)\s*\(')
+if ($usesStorageApi) {
+    foreach ($operation in @('get', 'set', 'clear', 'delete')) {
+        $count = [regex]::Matches($combined, ($storageCallPrefix + $operation + '\s*\(')).Count
+        if ($count -gt 0) { Write-Finding 'INFO' ('storage.{0}: {1} call(s).' -f $operation, $count) }
+    }
+    if ($combined -match ('(?s)' + $storageCallPrefix + 'set\s*\(.{0,800}?\bvalue\s*:\s*JSON\.stringify\s*\(')) {
+        Write-Finding 'INFO' 'JSON.stringify stored through @system.storage; verify the encoded value stays below 128 bytes and parsing peak fits the JS heap.'
+    }
+    if ($combined -match ($storageCallPrefix + 'clear\s*\(')) { Write-Finding 'INFO' 'storage.clear removes every app key; confirm a full reset is intended.' }
+}
 
 Write-Output '--- Audio ---'
 $usesSystemAudio = $combined -match '[''\"]@system\.audio[''\"]'
 if ($usesSystemAudio) {
-    $configText = ($liteConfigs | ForEach-Object { Get-Content -Raw -LiteralPath $_.FullName }) -join "`n"
     if ($configText -match 'ohos\.permission\.MODIFY_AUDIO_SETTINGS') { Write-Finding 'PASS' 'Audio permission MODIFY_AUDIO_SETTINGS is declared.' }
     else { Write-Finding 'WARN' '@system.audio is used but ohos.permission.MODIFY_AUDIO_SETTINGS was not found in Lite config.' }
     if ($combined -match 'internal://app/rawfile/audio/') { Write-Finding 'WARN' '@system.audio source appears to use rawfile directly; copy to internal://app/ before playback.' }
@@ -543,7 +668,7 @@ if ($usesSystemAudio) {
         $volume = [double]$match.Groups[1].Value
         if ($volume -lt 0 -or $volume -gt 1) { Write-Finding 'WARN' ('audio.volume literal outside 0.0-1.0: {0}' -f $volume) }
     }
-    if ($combined -match '\bfile\.copy\s*\(' -and $combined -match '\bfile\.rmdir\s*\(') {
+    if ($combined -match ($fileCallPrefix + 'copy\s*\(') -and $combined -match ($fileCallPrefix + 'rmdir\s*\(')) {
         Write-Finding 'INFO' 'file.copy and file.rmdir coexist; verify rmdir runs only after every asynchronous copy and access check completes.'
     }
 }

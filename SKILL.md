@@ -1,6 +1,6 @@
 ---
 name: huawei-lite-watch-development
-description: 规范华为 HarmonyOS Lite Wearable 轻智能手表应用的开发、修改、迁移、代码审查、性能优化和故障排查。用于包含 liteWearable、HML/CSS/JavaScript、JerryScript、common/rawfile 资源目录、@system.file、DevEco Studio Lite Wearable 模拟器、@system.audio 音频播放、64/256/512 KB JS heap、圆屏/方屏适配、图片内存池或旧版 API 兼容性的任务。Develop, review, migrate, optimize, or debug Huawei HarmonyOS Lite Wearable apps under strict HML, JavaScript, memory, resource, audio, API-version, simulator, and real-device constraints.
+description: 规范华为 HarmonyOS Lite Wearable 轻智能手表应用的开发、修改、迁移、代码审查、性能优化和故障排查。用于包含 liteWearable、HML/CSS/JavaScript、JerryScript、common/rawfile、@system.file、@system.storage、@system.sensor 传感器、加速度计、陀螺仪、心率、计步、罗盘、气压计、佩戴状态、@system.vibrator、DevEco Studio 模拟器、@system.audio、64/256/512 KB JS heap、圆屏/方屏、图片内存池或旧版 API 兼容性的任务。Develop, review, migrate, optimize, or debug Huawei HarmonyOS Lite Wearable apps under strict HML, JavaScript, file, storage, sensor, vibration, memory, resource, audio, API-version, simulator, and real-device constraints.
 ---
 
 # 华为轻智能手表开发规范
@@ -65,6 +65,14 @@ rg -n "接口名|模块名" references
 读取 [sdk-and-sources.md](references/sdk-and-sources.md) 选择资料。逐项确认 `since`、`deprecated`、`syscap`、权限、Lite Wearable 设备行为差异和订阅取消接口。优先保留目标设备已验证的 `@system.*` 接口；只有兼容矩阵与真机共同证明后，才迁移到 `@ohos.*` 或 `@kit.*`。
 
 完整读取 [hml-lite-syntax.md](references/hml-lite-syntax.md)。只使用 SDK Lite 组件白名单中的原生标签、属性、事件和父子结构。遇到不确定项时直接查 `lite_component_map.js`、`component_validator.js` 与当前 SDK 规则，不能依据 HTML、Vue、JSX、ArkUI 或浏览器行为猜测。自定义标签只有在项目中找到真实组件定义和注册后才能放行。
+
+需要官方组件细节时读取华为 [ArkUI JS 完整组件参考](https://developer.huawei.com/consumer/cn/doc/harmonyos-references/arkui-js-full-comp)，再用项目 SDK 的 Lite 白名单缩小范围。网页无法自动访问时，说明限制并使用本地 SDK；不得因“完整组件参考”中存在某标签就认定 Lite Wearable 支持。
+
+涉及传感器、计步、心率、加速度、罗盘、气压、佩戴状态或陀螺仪时，完整读取 [sensors-on-lite-wearable.md](references/sensors-on-lite-wearable.md)。按接口逐项核对最低 API、权限、硬件和 Lite 无效果说明；每个订阅必须有同名取消路径，只能把目标真机数据作为支持证据。
+
+涉及文件、rawfile 读写/复制、目录或键值持久化时，完整读取 [file-and-storage-on-lite-wearable.md](references/file-and-storage-on-lite-wearable.md)。保持回调顺序，不把 `@system.file` 当 Promise，不写删 rawfile，不用 storage 保存大值。
+
+涉及振动时，完整读取 [vibrator-on-lite-wearable.md](references/vibrator-on-lite-wearable.md)。声明权限、限制触发频率，并在目标真机验证马达和系统策略。
 
 ### 5. 按 JerryScript 和低堆实现
 
@@ -151,5 +159,8 @@ powershell -ExecutionPolicy Bypass -File scripts/audit_lite_watch_project.ps1 -P
 - 内存与运行时细则：[memory-and-runtime.md](references/memory-and-runtime.md)
 - JerryScript 语法规范：[jerryscript-syntax.md](references/jerryscript-syntax.md)
 - HML Lite 标签、属性、事件与表达式白名单：[hml-lite-syntax.md](references/hml-lite-syntax.md)
+- 传感器、权限、频率和生命周期：[sensors-on-lite-wearable.md](references/sensors-on-lite-wearable.md)
+- 文件、rawfile 与键值存储接口：[file-and-storage-on-lite-wearable.md](references/file-and-storage-on-lite-wearable.md)
+- 振动接口与权限：[vibrator-on-lite-wearable.md](references/vibrator-on-lite-wearable.md)
 - `shalu2` 音频实现规范：[audio-on-lite-wearable.md](references/audio-on-lite-wearable.md)
 - 审查与交付模板：[review-output-template.md](references/review-output-template.md)
