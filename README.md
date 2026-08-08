@@ -28,10 +28,10 @@ An unofficial, community-maintained Codex skill for developing and reviewing Hua
 SKILL.md
 agents/openai.yaml
 references/
-scripts/audit_lite_watch_project.ps1
+scripts/project-reviewer/run-reviewer.bat
 ```
 
-公开版只包含社区整理的规则和审计脚本。使用者需要自行合法获取 DevEco Studio、对应 SDK 和官方文档。
+公开版只包含社区整理的规则和评审脚本。使用者需要自行获取 DevEco Studio、对应 SDK 和官方文档。
 
 ### 安装
 
@@ -49,27 +49,22 @@ git clone https://github.com/AlanLinYu/huawei-lite-watch-development.git `
 在 Codex 中调用：
 
 ```text
-使用 $huawei-lite-watch-development 开发或审查这个 Lite Wearable 项目。
+使用 $huawei-lite-watch-development 开发或评审这个 Lite Wearable 项目。
 ```
 
-运行只读审计：
+运行只读评审：
 
-```powershell
-powershell -ExecutionPolicy Bypass `
-  -File scripts/audit_lite_watch_project.ps1 `
-  -ProjectPath <项目目录> `
-  -TargetHeapKB 64 `
-  -TargetApi 6 `
-  -SdkApiPath <DevEco-SDK>\default\openharmony\js\api
+```bat
+scripts\project-reviewer\run-reviewer.bat -ProjectPath <项目目录> -TargetHeapKB 64 -TargetApi 6 -SdkApiPath <DevEco-SDK>\default\openharmony\js\api
 ```
 
 构建后可增加：
 
-```powershell
--BuiltJsPath <项目>\entry\build\default\intermediates\loader_out_lite\default\js
+```bat
+scripts\project-reviewer\run-reviewer.bat -ProjectPath <项目目录> -BuiltJsPath <项目>\entry\build\default\intermediates\loader_out_lite\default\js
 ```
 
-脚本输出是启发式线索，不能替代 DevEco 构建和目标真机测试。
+脚本输出是启发式线索，不能替代 DevEco 构建和目标真机测试。启动器按序定位 Node.js（被检查应用的 `local.properties` 的 `nodejs.dir` → DevEco Studio 自带 node → PATH），找不到时报错退出。
 
 ### 贡献与证据
 
@@ -97,10 +92,10 @@ This repository provides a Codex skill for Huawei HarmonyOS Lite Wearable develo
 SKILL.md
 agents/openai.yaml
 references/
-scripts/audit_lite_watch_project.ps1
+scripts/project-reviewer/run-reviewer.bat
 ```
 
-The public repository contains only community-authored guidance and audit code. Obtain DevEco Studio, the matching SDK, and official documentation through authorized channels.
+The public repository contains only community-authored guidance and review code. Obtain DevEco Studio, the matching SDK, and official documentation through authorized channels.
 
 ### Install
 
@@ -121,24 +116,19 @@ Invoke the skill in Codex:
 Use $huawei-lite-watch-development to develop or review this Lite Wearable project.
 ```
 
-Run the read-only audit:
+Run the read-only review:
 
-```powershell
-powershell -ExecutionPolicy Bypass `
-  -File scripts/audit_lite_watch_project.ps1 `
-  -ProjectPath <project-directory> `
-  -TargetHeapKB 64 `
-  -TargetApi 6 `
-  -SdkApiPath <DevEco-SDK>\default\openharmony\js\api
+```bat
+scripts\project-reviewer\run-reviewer.bat -ProjectPath <project-directory> -TargetHeapKB 64 -TargetApi 6 -SdkApiPath <DevEco-SDK>\default\openharmony\js\api
 ```
 
 After a build, add:
 
-```powershell
--BuiltJsPath <project>\entry\build\default\intermediates\loader_out_lite\default\js
+```bat
+scripts\project-reviewer\run-reviewer.bat -ProjectPath <project-directory> -BuiltJsPath <project>\entry\build\default\intermediates\loader_out_lite\default\js
 ```
 
-Audit findings are heuristic. They do not replace a DevEco build or testing on the target watch.
+Review findings are heuristic. They do not replace a DevEco build or testing on the target watch. The launcher locates Node.js in order — `nodejs.dir` in the target app's `local.properties`, then DevEco Studio's bundled node, then node on PATH — and exits with an error when none is found.
 
 ### Contributing and evidence
 

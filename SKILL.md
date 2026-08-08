@@ -1,155 +1,145 @@
 ---
-name: huawei-lite-watch-development
-description: 规范华为 HarmonyOS Lite Wearable 轻智能手表应用的开发、修改、迁移、代码审查、性能优化和故障排查。用于包含 liteWearable、HML/CSS/JavaScript、JerryScript、common/rawfile 资源目录、@system.file、DevEco Studio Lite Wearable 模拟器、@system.audio 音频播放、64/256/512 KB JS heap、圆屏/方屏适配、图片内存池或旧版 API 兼容性的任务。Develop, review, migrate, optimize, or debug Huawei HarmonyOS Lite Wearable apps under strict HML, JavaScript, memory, resource, audio, API-version, simulator, and real-device constraints.
+name: hmlw-app
+description: 华为鸿蒙（Huawei HarmonyOS）轻量穿戴（轻智能，LiteWearable）应用（JS App）开发技能。此技能需要在对轻量穿戴应用进行开发、修改、迁移、代码评审、性能优化和故障排查时使用。此技能包含的知识、任务和关键词：华为手表、轻智能、轻量穿戴、LiteWearable、JS APP、华为手表硬件、应用JS Heap限制、圆屏/方屏不同分辨率适配、轻量穿戴系统、JerryScript、应用common/rawfile目录结构、应用HML/CSS/JS文件结构、应用config.json配置、@system.xxx格式的轻量穿戴API、DevEco Studio轻量穿戴应用开发、DevEco轻量穿戴预览器、DevEco轻量穿戴SDK、DevEco轻量穿戴构建工具ace-loader、轻量穿戴API版本特性及兼容性、HML代码规范、JS代码规范、CSS代码规范、代码语法限制、应用构建、app/hap格式、应用签名、项目依赖、项目版本、项目结构和语法检查工具、应用性能优化、应用内存优化、轻量穿戴文件系统、common目录、轻量穿戴音频播放、应用图片格式、轻量穿戴ViewModel MVVM。
 ---
 
-# 华为轻智能手表开发规范
+# 华为鸿蒙轻量穿戴应用开发技能
 
-把 Lite Wearable 当作受严格内存和版本约束的独立平台。先确定设备档案，再选接口和实现；不得以桌面预览、编译成功或普通 Wearable 支持来代替 Lite Wearable 真机兼容性。
+华为鸿蒙轻量穿戴（Lite Wearable）是华为智能手表产品线中介于手环与全功能智能手表之间的一类设备，如 WATCH GT、FIT 系列。此类设备可运行轻量应用，但受硬件资源限制（JS heap 不到 1M 的级别，屏幕为低分辨率圆屏或方屏），其开发方式与手机、平板及普通 Web 应用存在本质差异。本技能即为鸿蒙轻量穿戴应用开发相关的技能。
 
-## 证据优先级
+本页面为开发技能的导航首页，用于指示在何种场景下查阅对应的主题页面。具体规范不在本文件中，请进入下方对应参考资料页面完整阅读。
 
-按以下顺序解决冲突，并在结论中注明依据：
+## 基本理念
 
-1. 目标真机行为、固件、型号和已测日志。
-2. 项目实际使用的 SDK 中的 `*.d.ts`、Lite 组件白名单和构建配置。
-3. 用户提供或本机安装的官方接口资料与开发文档。
-4. 同版本、同工程形态的可运行演示项目。
-5. 推测或通用 HarmonyOS 经验。
+- 以目标真机行为为准：真机 > 项目 SDK 的 `*.d.ts` > 官方资料 > 演示工程 > 推测。
+- 不得以桌面预览、编译成功或普通 Wearable 支持代替 Lite Wearable 真机兼容性。
+- 只修改源码目录，忽略 build/.preview/.hvigor/node_modules/oh_modules 等生成或依赖目录。
 
-不得因为接口在新 SDK 中存在就认定旧表可用。不得把 `Wearable` 支持等同于 `Lite Wearable` 支持。资料中带 `?` 的字段只能作为待验证信息。
+## 开发实践流程
 
-## 工作流程
+端到端开发一个 Lite Wearable 页面/应用的标准步骤。每步先读对应参考资料，做完再进下一步；不要跳过验证步骤直接宣称完成。
 
-### 1. 建立目标设备档案
+### 0. 开发前：建立目标设备档案
 
-在写代码前明确并记录：型号/代号、圆屏或方屏、物理分辨率、适配分辨率、固件、最高 target、最高 compatible、运行时可查询的 API 版本、JS heap 档位、WearEngine 版本和所需硬件能力。
+写代码前先明确目标设备（型号/代号、圆屏或方屏、物理与适配分辨率、JS heap 档位 64/256/512、API 版本、WearEngine 版本）。未指定时按最差档设计：64 KB heap、旧版 API、圆屏安全区，并把最终兼容范围标为"待真机确认"。→ [真机硬件](references/hardware.md)
 
-读取 [device-compatibility.md](references/device-compatibility.md)。如果用户未指定型号，默认按最差档处理：64 KB JS heap、旧版 API、圆屏安全区；同时把最终兼容范围标为“待真机确认”。不得擅自把 512 KB 当作全系列下限。
+### 1. SDK 版本选择与 Gradle 配置
 
-### 2. 识别工程形态
+- 选定目标 SDK/DevEco 版本，在构建配置中设定两个字段：
+  - **`compileSdkVersion`（target）**：决定编译使用的 SDK，进而决定可用 API、语言特性与构建工具版本。
+  - **`compatibleSdkVersion`（compatible）**：唯一用处是真机安装时检测该值，高于设备实际版本会安装失败；不参与编译能力决定。
+- 旧版工程在根 `build.gradle`（`com.huawei.ohos.app`）与 `entry/build.gradle`（`com.huawei.ohos.hap`）中配置；新版工程用 hvigor 构建体系，配置不通用。
+- 先确认 SDK 目录结构判断编译链（API 6 及以前旧链 / API 7 及以后、API 10 及以后新链），再核对 `@since`/`@deprecated`/`@syscap`。→ [编译签名](references/build-sign.md)
 
-定位包含 `"liteWearable"` 的 `config.json`，确认源码通常位于：
+### 2. 应用配置（config.json）
 
-```text
-entry/src/main/config.json
-entry/src/main/js/<Ability>/app.js
-entry/src/main/js/<Ability>/pages/<page>/<page>.hml
-entry/src/main/js/<Ability>/pages/<page>/<page>.css
-entry/src/main/js/<Ability>/pages/<page>/<page>.js
-```
+- **包名**：`app.bundleName`，反域名格式（如 `com.example.app`）。
+- **版本号**：`app.version.code`（整数，如 `1000000`）与 `app.version.name`（如 `"1.0.0"`）。
+- **应用名称**：在 `resources/base/element/string.json` 中提供，`config.json` 中引用。
+- **图标**：`resources/base/media/icon.png`，按 SDK API≥10 → icon.png 104*104, icon_small.png 80*80；SDK API<10 → icon.png 114*114, icon_small.png 80*80 处理。
+- **权限**：`module.reqPermissions` 按需声明（如 `ohos.permission.MODIFY_AUDIO_SETTINGS`）。
+- 结构由 DevEco Studio 自动生成骨架，只写新增/更改部分，不要整体重写。→ [项目结构](references/project-structure.md)
 
-只修改源码目录。忽略 `build/`、`.preview/`、`.hvigor/`、`node_modules/`、`oh_modules/` 等生成或依赖目录。不要把 ArkUI/ArkTS、Web DOM、Node.js API 或普通 Quick App 约定直接套到 Lite Wearable。
+### 3. 逻辑拆解与页面划分
 
-### 3. 放置和引用资源
+- 分析需求，按职责拆成页面：一个页面 = `pages/<page>/` 下一个文件夹、一个功能。
+- 先定页面清单与跳转关系（`@system.router` 只有 `replace`，无 push/back）。
+- 数据与代码归属：页面私有数据放页面自身；页面间共享数据放 `app.js`（页面通过 `$app` 访问）；共享工具/固定图片放 `common`；需文件方式读取的放 `resources/rawfile`。→ [项目结构](references/project-structure.md) / [轻量穿戴 API](references/system-api.md)
 
-完整读取 [resource-layout-and-paths.md](references/resource-layout-and-paths.md)。创建项目时 `common` 通常不存在，需要在 `entry/src/main/js/<Ability>/common` 手动创建。
+### 4. 新建并注册页面
 
-把 HML/CSS 直接使用的固定图片放在 `common`，以 `/common/...` 绝对资源路径引用；公共 JS 使用相对 `import`。`common` 只在应用内部公共，对用户文件系统不可见，不能用 `@system.file` 枚举或读写。
+- 在 `entry/src/main/js/<Ability>/pages/<page>/` 新建 `<page>.hml` / `<page>.js` / `<page>.css` 三元组（hml/js/css 强绑定）。
+- 同时在 `config.json` 的 `module.js[].pages` 中注册页面路径，否则 `@system.router` 无法跳转。→ [项目结构](references/project-structure.md)
 
-所有打包图片必须使用英文 ASCII 文件名，推荐小写字母、数字、`_`、`-`；禁止中文、空格、全角符号、emoji 和其他非 ASCII 名称，否则真机可能无法识别或读取。`common`/`rawfile` 内图片子目录也使用英文 ASCII，且引用大小写与磁盘名称完全一致。
+### 5. 页面 JS 逻辑
 
-把必须经文件接口读取的原始数据、音频或特殊图片放在 `entry/src/main/resources/rawfile`，运行时以 `internal://app/rawfile/...` 访问。rawfile 按只读处理，需要修改或交给不支持 rawfile 直播的接口时先复制到 `internal://app/` 可写位置。不要把固定页面图片随意放 rawfile，也不要把 rawfile URI 写成 `/common/...`。
+- 按 MVVM 模式：`data` 声明状态，生命周期 `onInit`/`onShow`/`onHide`/`onDestroy`，事件处理与业务方法平级定义。
+- 每次跳转/`import` 都是新 JS 实例（Page ≠ Singleton），跨页面状态用 `$app` 或 `@system.storage`，不要依赖返回复用。
+- 定时器/传感器订阅必须在 `onDestroy` 清理，否则泄漏 JS heap。→ [ViewModel 与样式特性](references/viewmodel-style.md) / [JS 特性](references/js-syntax.md)
 
-按已知实测，部分 DevEco Studio 5.0/API 10 预览器和 Lite Wearable 模拟器不能调用 `@system.file`。任何 file API、rawfile 图片、读取或复制流程都必须打包签名后上真机验证；模拟器成功或失败都不能代替该结论。其他工具链版本也要重新实测，不能继承结论。
+### 6. JS 语法限制检查
 
-### 4. 查询接口和组件
+- `.js` 源码只允许 Lite ES6 子集：`let`/`const`、箭头函数、`class`、`for...of`、模板字符串、静态 `import`/`export`。
+- 禁止：`async`/`await`、`Promise`、生成器/`yield`、展开语法、可选链、动态 `import`、`eval`/`new Function` 等。
+- HML `{{...}}` 表达式只允许 ES5，保持简单，不写复杂表达式。
+- 内存默认按 64 KB heap 设计，常驻数据与峰值临时数据都要估算，公共 JS 用相对 `import`（产物会静态内联）。→ [JS 特性](references/js-syntax.md)
 
-先搜索项目实际使用的 SDK，再查用户提供或可合法访问的官方资料：
+### 7. 页面 HML/CSS 样式
 
-```powershell
-rg -n "接口名|@system\.模块名|@ohos\.模块名" "<DevEco-SDK>\default\openharmony\js\api"
-rg -n "接口名|模块名" references
-```
+- HML 用 Lite 组件白名单（`div`/`stack`/`list`/`text`/`image`/`progress` 等），没有 `<button>`，用 `<input type>` 或 `div` + 事件代替。
+- CSS 仅类选择器、`px` 与百分比单位、flex/stack 布局；不支持 `gap`/`position`/`background-image`/`calc()`。
+- 未设置的宽高默认 0、背景默认黑；文字只能放 `<text>` 元素（唯一自动计算高度的元素）。→ [ViewModel 与样式特性](references/viewmodel-style.md)
 
-读取 [sdk-and-sources.md](references/sdk-and-sources.md) 选择资料。逐项确认 `since`、`deprecated`、`syscap`、权限、Lite Wearable 设备行为差异和订阅取消接口。优先保留目标设备已验证的 `@system.*` 接口；只有兼容矩阵与真机共同证明后，才迁移到 `@ohos.*` 或 `@kit.*`。
+### 8. 多分辨率与圆/方屏适配
 
-完整读取 [hml-lite-syntax.md](references/hml-lite-syntax.md)。只使用 SDK Lite 组件白名单中的原生标签、属性、事件和父子结构。遇到不确定项时直接查 `lite_component_map.js`、`component_validator.js` 与当前 SDK 规则，不能依据 HTML、Vue、JSX、ArkUI 或浏览器行为猜测。自定义标签只有在项目中找到真实组件定义和注册后才能放行。
+- 优先按适配分辨率布局：稳定固定基准尺寸 + 百分比布局，不按物理分辨率写死 UI。
+- 圆屏：关键信息、按钮、滚动区域放入安全区，边缘仅放可裁切背景；核对最长中文文本、系统字号、点击/长按/滑动冲突与边缘裁切。
+- 方屏与圆屏分支显式、有限、可测试；宣称跨代兼容时必须覆盖最低分辨率档。→ [真机硬件](references/hardware.md) / [ViewModel 与样式特性](references/viewmodel-style.md)
 
-### 5. 按 JerryScript 和低堆实现
+### 9. 页面素材准备（音频、图片）
 
-完整读取 [jerryscript-syntax.md](references/jerryscript-syntax.md) 和 [memory-and-runtime.md](references/memory-and-runtime.md)。先区分 `.js` 源码、HML 表达式和最终构建产物：
+- **图片**：固定页面图放 `js/<Ability>/common`，以 `/common/...` 绝对路径引用；文件名必须英文 ASCII（字母/数字/`_`/`-`），禁止中文、空格、全角符号；按物理分辨率准备素材并估算解码内存（`宽*高*4`）。→ [真机文件系统](references/file-system.md) / [真机系统](references/system.md)
+- **音频**：`@system.audio` 按单活动音源设计；rawfile 音频先复制到可写目录再播放；MP3 文件头校验、单文件 ≤5 MiB、音量 0.0–1.0、播放结束与 `onDestroy` 清理。→ [真机系统](references/system.md)
 
-- `.js` 源码允许开发文档明确列出的 ES6 子集：`let/const`、箭头函数、`class`、默认参数、解构赋值/绑定、增强对象初始化器、`for...of`、剩余参数、模板字符串和静态模块声明。不得把此清单扩张成完整 ES6/ES2017+ 支持。
-- `.hml` 的 `{{...}}`、条件、属性绑定和事件参数明确不支持 ES6。保持为短小 ES5 表达式；复杂逻辑移入 `.js` 方法或预计算字段。
-- 默认禁止文档未列入 Lite 子集的 `async/await`、生成器、展开语法、动态 `import()`、可选链、空值合并、类字段、BigInt，以及未经目标 SDK/真机证明的 Promise 和新内建对象。
-- 文档允许的语法仍可能经构建链转译。对 64/256 KB heap、旧 SDK 或 helper 明显膨胀的路径，优先普通函数、显式参数检查和传统循环；不要为了风格强制把现有代码改成 ES5，也不要为了现代风格牺牲 heap。
-- 不在表端嵌入 QuickJS、Babel、webpack、解释器、通用 polyfill 集或大型第三方运行库。除非用户明确要求实验，否则禁止 `eval` 和 `Function` 动态执行路径。
-- 不把完整数据集、大型 JSON、字典、关卡、文章或图片元数据长期放在页面 `data` 或模块顶层。按页、按块、按当前场景从文件/存储读取。
-- 为数组、缓存、历史、队列、日志和存档数量设置上限。优先循环和原地更新，避免连续 `map/filter/reduce`、对象扩展和短生命周期大对象。
-- 将临时字符串、解析结果、回调闭包和重复副本计入 JS heap 风险。读取大文本时要分片或拆文件；`JSON.parse` 会同时产生源字符串与对象树，必须预留峰值。
-- 在 `onDestroy` 中清除所有定时器、动画、订阅、传感器监听、媒体对象和大引用。页面隐藏后仍运行的任务也要停止或证明必要。
-- 订阅类接口必须有一一对应的取消路径。传感器默认使用最低可接受频率，不能为了 UI 每帧刷新而使用 `game` 频率。
+### 10. rawfile 文件准备
 
-### 6. 实现音频
+- 需以文件方式读取的原始数据/音频放 `resources/rawfile`，运行时以 `internal://app/rawfile/...` 访问。
+- rawfile 按只读处理，需修改时先复制到 `internal://app/` 可写位置。
+- file/rawfile 流程无法由预览器证明，**必须真机验证**。→ [真机文件系统](references/file-system.md)
 
-任何涉及音乐、音效、音量、播放列表或 `@system.audio` 的任务，必须完整读取 [audio-on-lite-wearable.md](references/audio-on-lite-wearable.md)。若用户拥有 `shalu2` 或其他已在同型号真机运行的音频工程，优先检查其源码与构建产物；仓库不附带第三方案例源码。
+### 11. 本地验证（每完成一个页面按序执行）
 
-不得直接播放 `internal://app/rawfile/audio/...`。按 `shalu2` 方案将 `resources/rawfile/audio` 中的音乐、`playList` 和 `cur_playlist` 首次复制到 `internal://app/`，等待全部复制成功后再标记完成并播放 `internal://app/music/*.mp3`。使用 `@system.audio` 时配置 `ohos.permission.MODIFY_AUDIO_SETTINGS`，音量限制为 `0.0` 到 `1.0`，切换音源前停止当前播放，在页面和应用销毁路径停止音频并清除恢复定时器。
+1. **DevEco Studio 预览器看样式**：检查布局、字号、圆/方屏显示效果。
+2. **DevEco Studio 预览器看 JS 报错**：看 console 输出与运行时异常。
+3. **尝试编译**：构建无失败、无致命警告；检查 HAP 大小与产物 JS（单个产物 ≤48 KiB）。构建产物位置见 [编译签名](references/build-sign.md)。
+4. **运行评审脚本**：
 
-把 `@system.audio` 按单活动音源设计：背景音乐与音效切换时停止 BGM、播放音效、按已知时长恢复 BGM；未真机证明前不得假设可以多音轨混音。`rawfile/audio/get.js` 是电脑端 Node 生成工具，绝不能在 JerryScript 表端导入或执行。
+   ```bat
+   scripts\project-reviewer\run-reviewer.bat -ProjectPath <项目目录> -TargetHeapKB 64 -TargetApi 6
+   ```
 
-### 7. 管理图片池
+   构建后追加 `-BuiltJsPath <项目>\entry\build\default\intermediates\loader_out_lite\default\js`。`[WARN]`/`[RELEASE BLOCKER]` 项必须回到源码逐条核实修复，不能直接当作确定缺陷。→ [评审脚本使用说明](references/project-reviewer.md)
 
-把图片池与 JS heap 分开评估，但两者都必须受控。图片池容量“十几 MB”来自用户经验，只能作为近似量，不得写成设备保证。
+### 12. 真机测试
 
-- 以解码尺寸估算：`width * height * 4` 字节/张（RGBA 近似值），不能只看 PNG/JPEG 压缩大小。
-- 将素材预缩放到目标显示尺寸；不要依赖表端缩放超大原图。
-- 限制同屏、隐藏层、动画帧、预加载和缓存中的并发解码图片数。更新图片时避免旧图和新图长期同时保留。
-- 对长期换图页面，在实机验证普通赋值是否释放图片；若不会释放，保存最小状态并使用页面替换/重建作为受控回收手段。
-- 不用图片池较大来放宽 JS heap 约束；图片路径、帧表、元数据和绑定对象仍占 JS heap。
+- 预览/编译通过 ≠ 真机可用。产物**打包签名后才能上真机**，必须验证：冷启动、反复进退页面、长时间运行、快速操作、低存储、传感器/振动/音频/文件接口、JS heap 峰值、图片连续切换、异常恢复。
+- 未执行的验证必须明确写出，不能用"应该可用"代替。
+- 宣称跨代兼容时至少覆盖最低 heap/API/分辨率档。→ [编译签名](references/build-sign.md)
 
-### 8. 适配表盘屏幕
+## 工具
 
-以目标“适配分辨率”设计，以物理分辨率核对素材清晰度。圆屏把关键信息、按钮和滚动区域放入安全区，边缘仅承载可裁切背景。方屏与圆屏布局分支要显式、有限并可测试。
-
-优先稳定的固定基准尺寸配合百分比布局。核对最长中文文本、系统字号、列表滚动、点击/长按/滑动冲突、状态栏/表冠区域和屏幕边缘裁切。不得仅在 466x466 模拟器上通过后宣称兼容 390x390、454x454、408x480、336x480 或 280x456。
-
-### 9. 审计、构建和验证
-
-改动前后运行只读审计：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/audit_lite_watch_project.ps1 -ProjectPath <项目目录> -TargetHeapKB 64 -TargetApi 6
-```
-
-日常快速检查可加 `-SkipImageDimensions`；发布前必须去掉该开关以估算解码图片池。SDK 不在默认位置时用 `-SdkApiPath <当前SDK的js/api目录>`。构建后加 `-BuiltJsPath <loader_out_lite中的JS目录>` 检查转译结果。脚本只输出启发式线索，不修改项目。
-
-然后按风险分层验证：
-
-1. 静态检查：`config.json`、页面注册、导入接口、组件白名单、资源路径、权限和生命周期清理。
-2. DevEco 构建：确认转译后产物，不直接编辑产物；检查警告和 HAP 大小。
-3. Lite Wearable 模拟器：验证启动、路由、布局、交互和基础 API 冒烟。
-4. 目标真机：验证冷启动、反复进退页面、长时间运行、快速操作、低存储、传感器/振动/音频/文件、JS heap 峰值、图片连续切换和异常恢复。
-5. 最低档回归：若宣称跨代兼容，至少覆盖最低 heap/API/分辨率档；不能只测最高端型号。
-
-模拟器不证明真实传感器、功耗、文件系统差异、图片释放或内存上限。接口文档明确“仅支持真机调试”时，必须将真机结果列为发布阻塞项。
-
-## 输出要求
-
-每次开发或审查都给出：
-
-- 目标设备档案与仍未知字段。
-- 使用的 API/组件及最低版本、权限、Lite Wearable 差异。
-- JS heap 风险：常驻数据、峰值临时数据、定时器/订阅和清理点。
-- 语法风险：`.js` 源码是否完全属于文档列出的 Lite ES6 子集，HML 表达式是否保持 ES5，构建产物是否仍含不支持的语法/运行时依赖或高成本 helper。
-- 图片池风险：最大解码尺寸、最大并发图数和释放策略。
-- 资源风险：`common`/`rawfile` 选择、静态路径存在性、file API 真机验证状态和可写复制目标。
-- 音频风险：权限、真实格式、复制状态、播放路径、单音源切换、音量和销毁清理。
-- 已执行的构建/模拟器/真机验证；未执行项必须明确说明，不能用“应该可用”替代。
-- 兼容性结论：已验证、资料支持但未实测、或未知，三者分开标记。
-
-按 [review-output-template.md](references/review-output-template.md) 组织结论。发现问题时按影响排序，引用真实源码文件和行号；不要把审计脚本的启发式警告直接写成确定缺陷，必须回到源码验证。
-
-不要为了降低内存删除用户要求的功能。先采用分片、懒加载、有限缓存、资源缩放和生命周期回收；仍超预算时再说明具体取舍。
+改动前后可用评审脚本 `scripts/project-reviewer/run-reviewer.bat` 对项目做只读启发式检查。涉及运行命令、参数说明与检查项 → [评审脚本使用说明](references/project-reviewer.md)
 
 ## 参考资料
 
-- 设备和 heap 档位：[device-compatibility.md](references/device-compatibility.md)
-- SDK、本地资料与演示工程索引：[sdk-and-sources.md](references/sdk-and-sources.md)
-- `common`、`rawfile` 与真机文件路径规范：[resource-layout-and-paths.md](references/resource-layout-and-paths.md)
-- 内存与运行时细则：[memory-and-runtime.md](references/memory-and-runtime.md)
-- JerryScript 语法规范：[jerryscript-syntax.md](references/jerryscript-syntax.md)
-- HML Lite 标签、属性、事件与表达式白名单：[hml-lite-syntax.md](references/hml-lite-syntax.md)
-- `shalu2` 音频实现规范：[audio-on-lite-wearable.md](references/audio-on-lite-wearable.md)
-- 审查与交付模板：[review-output-template.md](references/review-output-template.md)
+### 真机硬件
+
+轻量穿戴设备按型号/代号区分圆屏或方屏，屏幕分辨率与传感器硬件能力（加速度计、心率、振动等）影响布局与功能设计。涉及设备档案、分辨率、屏幕适配 → [真机硬件](references/hardware.md)
+
+### 真机系统
+
+设备侧资源与能力受限：JS heap 按档位分（不到 1M 级别），API 版本与 WearEngine 版本决定可用特性，图片池、音频播放与权限请求需按约束处理。涉及图片池、API 版本、JS heap、音频播放、权限 → [真机系统](references/system.md)
+
+### 项目结构
+
+应用以 JS 应用包形式分发，页面由 HML（类 HTML 模板语言）、CSS 与 JavaScript 构成，工程由含 `liteWearable` 标记的 `config.json` 描述，源码位于 `entry/src/main/js/<Ability>/`。涉及工程形态、目录结构、common/rawfile、config.json 配置项 → [项目结构](references/project-structure.md)
+
+### 真机文件系统
+
+约定页面图片置于 `common` 目录并以 `/common/...` 路径引用，需经文件接口访问的数据置于 `resources/rawfile`。涉及应用沙盒路径、编译后路径、文件名规范 → [真机文件系统](references/file-system.md)
+
+### ViewModel 与样式特性
+
+页面遵循 MVVM ViewModel 模式，用 HML 模板（数据绑定、条件与列表渲染）配合组件白名单与 CSS 样式构建界面，样式与事件写法受 Lite 限制。涉及 MVVM、HML 模板与组件、事件、CSS → [ViewModel 与样式特性](references/viewmodel-style.md)
+
+### JS 特性（JerryScript）
+
+JavaScript 运行于轻量级引擎 JerryScript，仅支持文档列出的 ES6 子集；HML 表达式不支持 ES6，语法与内存约束严格。涉及语法环境区分、禁止项、内存约束 → [JS 特性](references/js-syntax.md)
+
+### 轻量穿戴 API（@system.*）
+
+系统能力通过 `@system.*` 系列模块提供，包括 `@system.router`（路由）、`@system.storage`（存储）、`@system.sensor`（传感器）、`@system.file`（文件）、`@system.audio`（音频）、`@system.device`（设备信息）等。涉及模块清单、签名要点、版本特性、错误码 → [轻量穿戴 API](references/system-api.md)
+
+### 编译签名
+
+使用 DevEco Studio 完成工程创建、预览与构建，产物经 ace-loader 等构建链转译后打包为 hap/app 部署至设备。涉及编译流程、SDK 定位、Gradle 配置、打包签名、验证分层 → [编译签名](references/build-sign.md)
