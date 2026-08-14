@@ -56,14 +56,17 @@
 
 ## 传感器硬件能力
 
-轻量穿戴通过 `@system.*` 模块访问传感器，全部为异步回调模式，参数与限制见 [system-api.md](system-api.md)：
+传感器接口方法、参数、权限与频率见 [system-api.md](system-api.md) 的 @system.sensor 章节，此处只列硬件视角的要点：
 
-- **加速度计**：`@system.sensor` 的 `subscribeAccelerometer`，返回 `{ x, y, z }`。只有订阅没有取消订阅，需按页面生命周期受控回收。
-- **心率**：`@system.sensor` 的 `subscribeHeartRate`，返回 `{ heartRate }`。
-- **振动**：`@system.vibrator` 的 `vibrate`，`mode: 'short' | 'long'`。
+- **加速度计**：从 API 6 起提供，是动作识别的基础。
+- **心率**：大多数手表型号支持，常与佩戴状态结合使用。
+- **陀螺仪**：从 API 6 起提供，属于能力增强；旧设备可能只有加速度计。
+- **罗盘**：目前真机暂不支持此 API，但后续新型号可能增加，因此使用时需要真机验证。
+- **距离 / 环境光 / 设备方向**：官方设备差异说明标为 Lite Wearable 调用无效果，不应依赖。
+- **振动**：`@system.vibrator`，依赖设备马达，只能在真机确认。
 - 其他：亮度（`@system.brightness`）、电量（`@system.battery`）、定位（`@system.geolocation`）等。
 
-传感器默认使用最低可接受频率，不能为了 UI 每帧刷新而使用 `game` 频率。模拟器不能证明真实传感器行为，必须在真机验证。
+模拟器不能证明真实传感器行为，必须在真机验证。
 
 ## 硬件不确定性
 

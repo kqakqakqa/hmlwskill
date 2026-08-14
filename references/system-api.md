@@ -125,10 +125,13 @@ export default class Storage {
 要点：
 
 - **key ≤ 32 字符**，不能包含特殊字符如 `\/"*+,:;<=>?[]|\x7F`。
-- **value 仅字符串**，长度受限（具体不详）；存储内容读取/修改均异步。
+- **value 仅字符串**，当前资料要求小于 128 字节；存储内容读取/修改均异步。
 - **`set` 空字符串值 = 删除**该 key 的数据项。
 - `get` 的 `default` 为 key 不存在时返回默认值；未指定则返回空字符串。
 - 异步回调模式，不是 Promise。
+- 不要把令牌、隐私数据或大 JSON 当作普通缓存塞入 storage。
+
+`storage.get` 返回字符串。若存 JSON，先检查长度和版本，再 `try/catch JSON.parse`。注意，同时存在的 JSON 源字符串与对象树会抬高 heap 峰值。
 
 ```javascript
 import storage from '@system.storage';
@@ -143,28 +146,110 @@ storage.get({
 
 ## @system.sensor
 
-```javascript
-interface AccelerometerData { x: number; y: number; z: number; }
-interface HeartRateData { heartRate: number; }
+传感器能力从 API 3 起提供；设备方向和陀螺仪从 API 6 起提供；部分接口（罗盘、距离、环境光、设备方向）不支持或暂未支持（表中标 `-`），以真机为准。所有接口都依赖手表实际硬件，必须经过真机测试。
 
-export default class Sensor {
-  static subscribeAccelerometer(options: {
-    callback: (data: AccelerometerData) => void;
-    fail?: (data: string, code: number) => void;
-  }): void;
+### 接口总表
 
-  static subscribeHeartRate(options: {
-    callback: (data: HeartRateData) => void;
-    fail?: (data: string, code: number) => void;
-  }): void;
-}
+| 数据 | 订阅/查询 | 取消 | 最低 API | 回调字段 | 权限 | Lite Wearable 说明 |
+| --- | --- | --- | ---: | --- | --- | --- |
+| 加速度 | `subscribeAccelerometer` | `unsubscribeAccelerometer` | 3 | `x`, `y`, `z` | `ohos.permission.ACCELEROMETER` | 支持取决于硬件；权限在部分工具链中属于系统权限 |
+| 罗盘 | `subscribeCompass` | `unsubscribeCompass` | - | `direction` | 无文档化应用权限 | 方向角度；需真机校准和验证 |
+| 距离 | `subscribeProximity` | `unsubscribeProximity` | - | `distance` | 无文档化应用权限 | 官方设备差异说明：Lite Wearable 调用无效果，不应依赖 |
+| 环境光 | `subscribeLight` | `unsubscribeLight` | - | `intensity` | 无文档化应用权限 | 官方设备差异说明：Lite Wearable 调用无效果，不应依赖 |
+| 计步 | `subscribeStepCounter` | `unsubscribeStepCounter` | 3 | `steps` | `ohos.permission.ACTIVITY_MOTION` | 返回重启后累计步数，不是本次会话增量 |
+| 气压 | `subscribeBarometer` | `unsubscribeBarometer` | 3 | `pressure` | 无文档化应用权限 | 本地声明与文档对单位存在差异，必须以目标版本和真机校验 |
+| 心率 | `subscribeHeartRate` | `unsubscribeHeartRate` | 3 | `heartRate` | `ohos.permission.READ_HEALTH_DATA` | 默认约 5 秒一次；本地 SDK 声明指出 `255` 可表示无效值 |
+| 佩戴状态 | `subscribeOnBodyState` | `unsubscribeOnBodyState` | 3 | `value` | 无文档化应用权限 | `true` 表示已佩戴；可结合心率有效性判断 |
+| 当前佩戴状态 | `getOnBodyState` | 无 | 3 | `value` | 无文档化应用权限 | 单次异步查询，支持 `complete` |
+| 设备方向 | `subscribeDeviceOrientation` | `unsubscribeDeviceOrientation` | - | `alpha`, `beta`, `gamma` | 无文档化应用权限 | 官方设备差异说明：Lite Wearable 调用无效果，不应依赖 |
+| 陀螺仪 | `subscribeGyroscope` | `unsubscribeGyroscope` | 6 | `x`, `y`, `z` | `ohos.permission.GYROSCOPE` | 旋转角速度；权限在部分工具链中属于系统权限 |
+
+"无文档化应用权限"只表示当前索引未列出额外权限，不表示任何固件上都无需权限。始终检查目标 SDK 声明和 `config.json`。
+
+### 频率与功耗
+
+只有加速度、设备方向和陀螺仪选项包含 `interval`：
+
+| 值 | 典型间隔 | 用途 | 规则 |
+| --- | ---: | --- | --- |
+| `normal` | 约 200 ms | 普通交互、低功耗 | 默认首选 |
+| `ui` | 约 60 ms | 需要较顺滑的 UI | 先节流 UI 更新再采用 |
+| `game` | 约 20 ms | 动作识别或游戏 | 仅在确有算法需求、真机功耗和 heap 通过时使用 |
+
+订阅频率不是渲染频率。传感器可以高频采样，但页面状态更新、日志和图片切换应节流。对 64 KB heap，优先复用模块级数字变量或固定长度环形缓冲区。
+
+### 生命周期范式
+
+```js
+import Sensor from '@system.sensor';
+
+let sensing = false;
+
+export default {
+  data: {
+    ax: 0,
+    ay: 0,
+    az: 0
+  },
+
+  startSensor: function () {
+    if (sensing) {
+      return;
+    }
+    sensing = true;
+    Sensor.subscribeAccelerometer({
+      interval: 'normal',
+      success: (ret) => {
+        this.ax = ret.x;
+        this.ay = ret.y;
+        this.az = ret.z;
+      },
+      fail: (data, code) => {
+        sensing = false;
+        console.error('accelerometer failed: ' + code + ', ' + data);
+      }
+    });
+  },
+
+  stopSensor: function () {
+    if (!sensing) {
+      return;
+    }
+    Sensor.unsubscribeAccelerometer();
+    sensing = false;
+  },
+
+  onDestroy: function () {
+    this.stopSensor();
+  }
+};
 ```
 
-要点：
+箭头函数属于文档列出的 `.js` ES6 子集，并有利于保留页面 `this`；若旧构建链 helper 过重或目标真机不稳定，改为保存 `const page = this` 后使用普通函数。不要在 HML 表达式中使用箭头函数。
 
-- **只有 `subscribeAccelerometer`/`subscribeHeartRate`，没有取消订阅接口**。订阅类接口必须有一一对应的取消路径；无 unsubscribe 时按页面生命周期重建来受控回收，并在 `onDestroy` 停止回调，见 [定时器 / 订阅配对](js-syntax.md#定时器--订阅配对)。
-- 传感器默认使用最低可接受频率，不能为了 UI 每帧刷新而使用 `game` 频率。
-- 加速度计返回 x/y/z，心率返回 heartRate。真机才可证明传感器行为，见 [传感器硬件能力](hardware.md#传感器硬件能力)。
+同时订阅加速度和陀螺仪时，分别维护状态并分别取消。API 低于 6 时不得调用陀螺仪；不能只给订阅加版本判断而无条件取消。
+
+### 权限和配置
+
+根据使用项在 Lite 模块的 `config.json` 中声明所需权限：
+
+| 能力 | 权限 |
+| --- | --- |
+| 加速度 | `ohos.permission.ACCELEROMETER` |
+| 计步 | `ohos.permission.ACTIVITY_MOTION` |
+| 心率 | `ohos.permission.READ_HEALTH_DATA` |
+| 陀螺仪 | `ohos.permission.GYROSCOPE` |
+
+部分权限可能是系统权限，第三方应用即使声明也未必获得。构建成功不能证明授权成功；把 `fail` 回调与真机授权结果记录在兼容矩阵中。
+
+### 逐项注意事项
+
+- **加速度与陀螺仪**：`x/y/z` 坐标方向、量纲和设备姿态关系以目标型号实测为准。动作识别用时间窗和阈值时，固定窗口上限；不要无限记录历史样本。旧设备可能只有加速度计。
+- **罗盘**：`direction` 是设备朝向角度。磁场干扰、佩戴姿势和校准会影响结果。UI 应容忍短时跳变，不要在每次回调重建整个页面。
+- **计步**：`steps` 是累计值。会话步数应保存起始基线并计算非负差值。设备重启或计数器复位后，当前值可能小于基线；此时重置基线，不要产生负步数。
+- **心率与佩戴状态**：心率回调默认约 5 秒一次，不适合动画帧驱动。把 `255`、非正数、未佩戴时读数及设备特定哨兵值视为待过滤数据，不直接展示为有效心率。健康数据属于敏感信息，只保留功能必需值，不写入无界日志。
+- **气压计**：字段为 `pressure`。当前资料存在 Pa 与 hPa 的单位表述差异，不在代码中硬编码换算结论。在已知海拔/天气条件下观察数量级，并记录设备型号、固件、SDK 文档单位后再决定换算。
+- **Lite 无效果接口**：`subscribeProximity`、`subscribeLight`、`subscribeDeviceOrientation` 在现有官方设备差异说明中标为 Lite Wearable 无效果。必须把它们标成不可依赖能力，而不是因为类型声明存在就放行。
 
 ## @system.app
 
@@ -322,6 +407,21 @@ export default class File {
 - `writeText` 的 `uri` 不存在时自动创建文件；`set` 风格无「空串删除」语义，删除请用 `delete`。
 - **部分 DevEco Studio 5.0/API 10 预览器和 Lite Wearable 模拟器不能调用 `@system.file`**，任何 file/rawfile 流程必须打包签名后真机验证。
 - 大文件读取注意 JS heap 峰值（`readText` 返回完整字符串），见 [峰值管理](js-syntax.md#峰值管理)。
+
+常见错误码：`202` 参数错误、`300` I/O 错误、`301` 文件或目录不存在、`302` 文本读取超过接口限制。设备实现可能增加差异，必须保留 `fail`。
+
+### 文件回调和错误
+
+- 由于异步回调特性，在需要依赖执行顺序时应当在 `success` 或 `complete` 后进入下一步，而不是直接并排调用。并排调用 `mkdir`、`copy`、`readText` 会导致潜在的时序问题。
+- `complete` 无论成功失败都会运行，不能在其中假设文件已写入。建议在无论成功失败都需进入下一步的时候使用。
+- 删除和递归删除前，需校验 URI 是应用预期的固定前缀。把外部输入直接传给 `delete`/`rmdir` 是极其危险的行为，应当禁止。
+
+### 低内存规则
+
+- `readText` 默认最多按 4096 字节设计；不要先读完整大文件再 `JSON.parse`。
+- `readArrayBuffer` 必须给受控 `length`。读取图片、音频等大文件到 JS buffer 会占用 JS heap，与媒体/图片池不是同一预算。
+- `file.get({ recursive: true })` 和大目录 `file.list` 会创建对象数组；限制目录文件数，处理后清空引用。
+- 日志不要打印完整文本、buffer 或 `JSON.stringify(fileList)`。
 
 ```javascript
 import file from '@system.file';
@@ -490,6 +590,7 @@ export default class Vibrator {
     mode?: 'short' | 'long';
     success?: () => void;
     fail?: (data: string, code: number) => void;
+    complete?: () => void;
   }): void;
 }
 
@@ -513,6 +614,19 @@ import vibrator from '@system.vibrator';
 
 vibrator.vibrate({ mode: 'short' });
 ```
+
+`vibrator.vibrate(options)` 从 API 3 起提供，依赖设备马达，只能在真机确认。新 SDK 可能将它标为 API 8 起 deprecated，但 Lite Wearable 旧工程不应在没有 SDK/syscap/真机证据时改用 `@ohos.vibrator` 或 ArkTS kit 导入。
+
+需要在 Lite 模块配置中声明 `ohos.permission.VIBRATE`。部分系统权限或产品策略仍可能阻止第三方应用调用，必须处理 `fail`。
+
+### 振动使用规则
+
+- 用户设置允许关闭振动；不要每次渲染或传感器采样都振动。
+- 点击防抖，避免快速连点形成连续马达请求。
+- 心率、计步等后台回调不得默认触发振动。
+- `short`/`long` 的实际时长、强度、并发调用行为和静音/勿扰模式影响按型号记录。
+- API 没有通用的自定义波形、强度或取消能力时，不要伪造这些接口。
+- 模拟器最多验证调用路径，不代表硬件振动、权限或功耗结果。
 
 ## @system.audio
 
