@@ -19,8 +19,12 @@ An unofficial, community-maintained Codex skill for developing and reviewing Hua
 - 固定页面图片放在手动创建的 `js/<Ability>/common`，以 `/common/...` 引用。
 - 图片名称必须使用英文 ASCII 字母、数字、`_`、`-`，禁止中文、空格和全角符号。
 - `resources/rawfile` 通过 `internal://app/rawfile/...` 和 `@system.file` 访问，file/rawfile 流程必须真机验证。
+- `@system.file` 的 12 个文件方法、`@system.storage` 的 4 个键值方法均有参数、错误、顺序和低内存规范。
+- `@system.sensor` 覆盖加速度、罗盘、计步、气压、心率、佩戴状态和陀螺仪，并检查最低 API、权限与订阅清理。
+- `@system.vibrator` 检查 `VIBRATE` 权限、触发节流和目标真机行为。
 - `@system.audio` 按单活动音源设计，rawfile 音频先复制到可写目录再播放。
 - 模拟器和预览器不能证明真实传感器、文件接口、音频解码、图片释放或内存上限。
+- HML 细节可查华为官方 [ArkUI JS 完整组件参考](https://developer.huawei.com/consumer/cn/doc/harmonyos-references/arkui-js-full-comp)，但仍以 Lite SDK 白名单过滤。
 
 ### 仓库结构
 
@@ -83,8 +87,12 @@ This repository provides a Codex skill for Huawei HarmonyOS Lite Wearable develo
 - Put fixed page images in a manually created `js/<Ability>/common` directory and reference them as `/common/...`.
 - Image names must use ASCII letters, digits, `_`, and `-`. Do not use Chinese characters, spaces, full-width punctuation, or emoji.
 - Access `resources/rawfile` through `internal://app/rawfile/...` and `@system.file`. File/rawfile behavior requires signed real-device testing.
+- Document all 12 `@system.file` methods and all four `@system.storage` methods, including parameters, errors, sequencing, and low-memory rules.
+- Cover accelerometer, compass, steps, barometer, heart rate, on-body state, and gyroscope through `@system.sensor`, with API, permission, and unsubscribe checks.
+- Validate `@system.vibrator` permission, throttling, and real-device behavior.
 - Model `@system.audio` as one active stream. Copy packaged rawfile audio to a writable location before playback.
 - Previewer and simulator results do not prove sensor behavior, file APIs, audio decoding, image release, or memory ceilings.
+- Use Huawei's official [ArkUI JS full component reference](https://developer.huawei.com/consumer/cn/doc/harmonyos-references/arkui-js-full-comp) for details, then restrict it through the Lite SDK whitelist.
 
 ### Repository layout
 
