@@ -1,5 +1,5 @@
 ---
-name: hmlw-app
+name: hmlwskill
 description: 华为鸿蒙（Huawei HarmonyOS）轻量穿戴（轻智能，LiteWearable）应用（JS App）开发技能。此技能需要在对轻量穿戴应用进行开发、修改、迁移、代码评审、性能优化和故障排查时使用。此技能包含的知识、任务和关键词：华为手表、轻智能、轻量穿戴、LiteWearable、JS APP、华为手表硬件、应用JS Heap限制、圆屏/方屏不同分辨率适配、轻量穿戴系统、JerryScript、应用common/rawfile目录结构、应用HML/CSS/JS文件结构、应用config.json配置、@system.xxx格式的轻量穿戴API、DevEco Studio轻量穿戴应用开发、DevEco轻量穿戴预览器、DevEco轻量穿戴SDK、DevEco轻量穿戴构建工具ace-loader、轻量穿戴API版本特性及兼容性、HML代码规范、JS代码规范、CSS代码规范、代码语法限制、应用构建、app/hap格式、应用签名、项目依赖、项目版本、项目结构和语法检查工具、应用性能优化、应用内存优化、轻量穿戴文件系统、common目录、轻量穿戴音频播放、应用图片格式、轻量穿戴ViewModel MVVM。
 ---
 
