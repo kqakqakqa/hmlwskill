@@ -1,30 +1,20 @@
-# 华为轻智能手表开发 Codex Skill / Huawei Lite Wearable Development Skill
+# 华为鸿蒙轻量穿戴应用开发技能 / Huawei HarmonyOS Lite Wearable JS App Development Skill
 
 [中文](#中文) | [English](#english)
 
-An unofficial, community-maintained Codex skill for developing and reviewing Huawei HarmonyOS Lite Wearable applications under strict runtime, syntax, memory, resource, audio, and device-compatibility constraints.
-
-> This project is not affiliated with or endorsed by Huawei. Huawei, HarmonyOS, and related marks belong to their respective owners. This repository does not redistribute vendor SDK files, original vendor documentation, device screenshots, or third-party demo projects.
-
 ## 中文
 
-这是一个面向华为 HarmonyOS Lite Wearable 轻智能手表开发的 Codex skill，重点解决普通 Web、完整 ES6、ArkUI 或高内存设备经验被错误套用到轻智能手表的问题。
+一个由社区维护的第三方技能，用于在严格的运行时、语法、内存、资源、音频和设备兼容性约束下，开发和评审华为鸿蒙轻量穿戴应用。
 
-### 核心约束
+> 本项目与华为无关，未获华为认可或背书。华为、HarmonyOS 及相关商标归其各自所有者所有。本仓库不重新分发厂商 SDK 文件、厂商原始文档、设备截图或第三方演示项目。
 
-- JerryScript JS heap 按 `64 / 256 / 512 KB` 分档，目标设备未知时默认按 64 KB 设计。
-- 图片解码池与 JS heap 分开计算，图片按 `宽 * 高 * 4` 估算 RGBA 峰值。
-- `.js` 只允许官方文档列出的部分 ES6；HML 的 `{{...}}` 表达式不支持 ES6。
-- HML 标签、属性、事件和父子结构按 Lite SDK 白名单检查。
-- 固定页面图片放在手动创建的 `js/<Ability>/common`，以 `/common/...` 引用。
-- 图片名称必须使用英文 ASCII 字母、数字、`_`、`-`，禁止中文、空格和全角符号。
-- `resources/rawfile` 通过 `internal://app/rawfile/...` 和 `@system.file` 访问，file/rawfile 流程必须真机验证。
-- `@system.file` 的 12 个文件方法、`@system.storage` 的 4 个键值方法均有参数、错误、顺序和低内存规范。
-- `@system.sensor` 覆盖加速度、罗盘、计步、气压、心率、佩戴状态和陀螺仪，并检查最低 API、权限与订阅清理。
-- `@system.vibrator` 检查 `VIBRATE` 权限、触发节流和目标真机行为。
-- `@system.audio` 按单活动音源设计，rawfile 音频先复制到可写目录再播放。
-- 模拟器和预览器不能证明真实传感器、文件接口、音频解码、图片释放或内存上限。
-- HML 细节可查华为官方 [ArkUI JS 完整组件参考](https://developer.huawei.com/consumer/cn/doc/harmonyos-references/arkui-js-full-comp)，但仍以 Lite SDK 白名单过滤。
+本技能用于开发与评审华为鸿蒙轻量穿戴设备（轻智能手表，如 WATCH GT、FIT 系列）上运行的应用。轻量穿戴设备的运行环境与手机、平板和普通 Web 应用差异很大：
+
+- JS heap 只有 KB 级
+- 屏幕为低分辨率圆屏或方屏
+- JS/HML/CSS 仅支持精简子集
+
+本技能旨在指导智能体在此类约束下完成轻量穿戴应用的开发、修改、迁移、代码评审、性能优化和故障排查，避免将完整 Web、标准 ES6、ArkUI 或高内存设备的经验错误套用于手表应用。
 
 ### 仓库结构
 
@@ -35,9 +25,11 @@ references/
 scripts/project-reviewer/run-reviewer.bat
 ```
 
-公开版只包含社区整理的规则和评审脚本。使用者需要自行获取 DevEco Studio、对应 SDK 和官方文档。
+此公开仓库仅包含社区维护的技能、参考资料和评审脚本。DevEco Studio、HarmonyOS SDK 和官方文档需要自行获取。
 
 ### 安装
+
+#### Codex
 
 将仓库克隆到 Codex skills 目录：
 
@@ -46,11 +38,13 @@ git clone https://github.com/AlanLinYu/huawei-lite-watch-development.git `
   "$env:USERPROFILE\.codex\skills\huawei-lite-watch-development"
 ```
 
-也可以只下载源码，在使用时显式指向 `SKILL.md`。
+或者不克隆仓库，直接下载源码，并在使用时显式指定 `SKILL.md`。
 
 ### 使用
 
-在 Codex 中调用：
+#### Codex
+
+调用：
 
 ```text
 使用 $huawei-lite-watch-development 开发或评审这个 Lite Wearable 项目。
@@ -68,31 +62,23 @@ scripts\project-reviewer\run-reviewer.bat -ProjectPath <项目目录> -TargetHea
 scripts\project-reviewer\run-reviewer.bat -ProjectPath <项目目录> -BuiltJsPath <项目>\entry\build\default\intermediates\loader_out_lite\default\js
 ```
 
-脚本输出是启发式线索，不能替代 DevEco 构建和目标真机测试。启动器按序定位 Node.js（被检查应用的 `local.properties` 的 `nodejs.dir` → DevEco Studio 自带 node → PATH），找不到时报错退出。
+脚本输出是启发式线索，不能替代 DevEco 构建和目标真机测试。启动器按以下顺序定位 Node.js：被检查应用的 `local.properties` 的 `nodejs.dir` → DevEco Studio 自带 node → PATH，找不到时报错退出。
 
 ### 贡献与证据
 
-提交兼容性规则时，请提供 SDK/API 版本、设备型号、固件、最小复现和真机结果。不要提交厂商原始文档、SDK 文件、包含个人信息的日志或未经授权的第三方源码。
+提交兼容性规则时，请附上 SDK/API 版本、设备型号、固件、最小复现和真机结果。请勿提交厂商原始文档、SDK 文件、包含个人信息的日志或未经授权的第三方源码。
+
+### 许可证
+
+本仓库中的社区代码和文档均以 [MIT License](LICENSE) 授权。此许可不授予对华为产品、SDK、文档、商标或第三方材料的任何权利。
 
 ## English
 
-This repository provides a Codex skill for Huawei HarmonyOS Lite Wearable development. It prevents assumptions from full web runtimes, unrestricted ES6, ArkUI, or high-memory devices from leaking into constrained watch applications.
+An unofficial, community-maintained Codex skill for developing and reviewing Huawei HarmonyOS Lite Wearable applications under strict runtime, syntax, memory, resource, audio, and device-compatibility constraints.
 
-### Core constraints
+> This project is not affiliated with or endorsed by Huawei. Huawei, HarmonyOS, and related marks belong to their respective owners. This repository does not redistribute vendor SDK files, original vendor documentation, device screenshots, or third-party demo projects.
 
-- Treat the JerryScript JS heap as a strict `64 / 256 / 512 KB` budget. Default to 64 KB when the target is unknown.
-- Budget the decoded image pool separately from the JS heap. Estimate RGBA memory as `width * height * 4`.
-- Allow only the documented ES6 subset in `.js` source. ES6 is not allowed inside HML `{{...}}` expressions.
-- Validate HML tags, attributes, events, and parent-child rules against the Lite SDK whitelist.
-- Put fixed page images in a manually created `js/<Ability>/common` directory and reference them as `/common/...`.
-- Image names must use ASCII letters, digits, `_`, and `-`. Do not use Chinese characters, spaces, full-width punctuation, or emoji.
-- Access `resources/rawfile` through `internal://app/rawfile/...` and `@system.file`. File/rawfile behavior requires signed real-device testing.
-- Document all 12 `@system.file` methods and all four `@system.storage` methods, including parameters, errors, sequencing, and low-memory rules.
-- Cover accelerometer, compass, steps, barometer, heart rate, on-body state, and gyroscope through `@system.sensor`, with API, permission, and unsubscribe checks.
-- Validate `@system.vibrator` permission, throttling, and real-device behavior.
-- Model `@system.audio` as one active stream. Copy packaged rawfile audio to a writable location before playback.
-- Previewer and simulator results do not prove sensor behavior, file APIs, audio decoding, image release, or memory ceilings.
-- Use Huawei's official [ArkUI JS full component reference](https://developer.huawei.com/consumer/cn/doc/harmonyos-references/arkui-js-full-comp) for details, then restrict it through the Lite SDK whitelist.
+This skill targets Huawei HarmonyOS Lite Wearable applications — light smartwatches such as the WATCH GT and FIT series. Their runtime differs greatly from phones, tablets, and web apps: the JS heap is measured in hundreds of KB, screens are low-resolution round or square, and only a restricted subset of JS/HML/CSS is supported. The skill guides Codex through developing, modifying, migrating, reviewing, optimizing, and debugging Lite Wearable applications under these constraints, keeping full-web, full-ES6, ArkUI, or high-memory assumptions out of watch code.
 
 ### Repository layout
 
@@ -142,6 +128,6 @@ Review findings are heuristic. They do not replace a DevEco build or testing on 
 
 Compatibility changes should include the SDK/API version, device model, firmware, a minimal reproduction, and real-device results. Do not submit vendor documentation, SDK files, personal logs, or third-party source code without redistribution rights.
 
-## License
+### License
 
 Community-authored code and documentation in this repository are licensed under the [MIT License](LICENSE). This license does not grant rights to Huawei products, SDKs, documentation, trademarks, or third-party materials.
