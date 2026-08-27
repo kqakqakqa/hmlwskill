@@ -60,7 +60,7 @@ description: 华为鸿蒙（Huawei HarmonyOS）轻量穿戴（轻智能，Lite W
 ### 6. JS 语法限制检查
 
 - `.js` 源码只允许 Lite ES6 子集：`let`/`const`、箭头函数、`class`、`for...of`、模板字符串、静态 `import`/`export`。
-- 禁止：`async`/`await`、`Promise`、生成器/`yield`、展开语法、可选链、动态 `import`、`eval`/`new Function` 等。
+- 禁止：`async`/`await`、`Promise`、生成器/`yield`、动态 `import` 等。
 - HML `{{...}}` 表达式只允许 ES5，保持简单，不写复杂表达式。
 - 内存默认按 64 KB heap 设计，常驻数据与峰值临时数据都要估算，公共 JS 用相对 `import`（产物会静态内联）。→ [JS 特性](references/js-syntax.md)
 
@@ -69,6 +69,8 @@ description: 华为鸿蒙（Huawei HarmonyOS）轻量穿戴（轻智能，Lite W
 - HML 用 Lite 组件白名单（`div`/`stack`/`list`/`text`/`image`/`progress` 等），没有 `<button>`，用 `<input type>` 或 `div` + 事件代替。
 - CSS 仅类选择器、`px` 与百分比单位、flex/stack 布局；不支持 `gap`/`position`/`background-image`/`calc()`。
 - 未设置的宽高默认 0、背景默认黑；文字只能放 `<text>` 元素（唯一自动计算高度的元素）。→ [ViewModel 与样式特性](references/viewmodel-style.md)
+- **视觉组件原则**：把 SVG 视为 HML 受限时的额外视觉 UI 图层，而不是普通插图。`<stack>` 中由 PNG/SVG 构建产物提供卡片形状、渐变、描边、高光和阴影，HML 叠加动态文字与交互；尤其在 API 10+ 场景，用此方式补足 Lite CSS 无法表达的现代样式。
+- **尺寸与复用**：按控件的实际宽高、圆角、点击范围和语义创建专用 SVG 底板，不因“都是卡片”强行复用并缩放。仅当这些条件都一致时才复用；新页面的不同规格控件优先新增对应视觉组件，避免拉伸、裁切和不匹配的触控区域。
 
 ### 8. 多分辨率与圆/方屏适配
 
@@ -78,7 +80,8 @@ description: 华为鸿蒙（Huawei HarmonyOS）轻量穿戴（轻智能，Lite W
 
 ### 9. 页面素材准备（音频、图片）
 
-- **图片**：固定页面图放 `js/<Ability>/common`，以 `/common/...` 绝对路径引用；文件名必须英文 ASCII（字母/数字/`_`/`-`），禁止中文、空格、全角符号；按物理分辨率准备素材并估算解码内存（`宽*高*4`）。→ [真机文件系统](references/file-system.md) / [真机系统](references/system.md)
+- **图片**：固定页面图放 `js/<Ability>/common`，以 `/common/...` 绝对路径引用；按物理分辨率准备素材并估算解码内存（`宽*高*4`）。涉及图片格式、`.bin`、SVG 栅格化、`--topng`、`--nobin`、`--pngquant` 或图片构建失败时，必须先读 [Lite 图片转换器](references/img-converter.md)，再按 [真机文件系统](references/file-system.md) 处理最终文件名和引用路径，并按 [真机系统](references/system.md) 评估图片内存。
+- **SVG 视觉组件**：在 `common` 中保留可追溯的 SVG 源文件，并为每个独立控件规格生成运行时 PNG；文件名按组件语义命名，例如 `about_info_card`、`api_key_input_card`，不要用一张通用卡片图承载不相同的布局。
 - **音频**：`@system.audio` 按单活动音源设计；rawfile 音频先复制到可写目录再播放；MP3 文件头校验、单文件 ≤5 MiB、音量 0.0–1.0、播放结束与 `onDestroy` 清理。→ [真机系统](references/system.md)
 
 ### 10. rawfile 文件准备
@@ -98,7 +101,7 @@ description: 华为鸿蒙（Huawei HarmonyOS）轻量穿戴（轻智能，Lite W
    scripts\project-reviewer\run-reviewer.bat -ProjectPath <项目目录> -TargetHeapKB 64 -TargetApi 6
    ```
 
-   构建后追加 `-BuiltJsPath <项目>\entry\build\default\intermediates\loader_out_lite\default\js`。`[WARN]`/`[RELEASE BLOCKER]` 项必须回到源码逐条核实修复，不能直接当作确定缺陷。→ [评审脚本使用说明](references/project-reviewer.md)
+   构建后追加 `-BuiltJsPath <项目>\entry\build\default\intermediates\loader_out_lite\default\js`。同时检查图片转换日志、最终资源名和 `.bin` 输出，规则见 [Lite 图片转换器](references/img-converter.md#构建与验证)。`[WARN]`/`[RELEASE BLOCKER]` 项必须回到源码逐条核实修复，不能直接当作确定缺陷。→ [评审脚本使用说明](references/project-reviewer.md)
 
 ### 12. 真机测试
 
@@ -127,6 +130,10 @@ description: 华为鸿蒙（Huawei HarmonyOS）轻量穿戴（轻智能，Lite W
 ### 真机文件系统
 
 约定页面图片置于 `common` 目录并以 `/common/...` 路径引用，需经文件接口访问的数据置于 `resources/rawfile`。涉及应用沙盒路径、编译后路径、文件名规范 → [真机文件系统](references/file-system.md)
+
+### Lite 图片转换器
+
+Lite 构建会处理受支持格式的图片，并可生成 `.bin`、转换 PNG、跳过 `.bin` 或调用 pngquant 压缩 PNG。涉及图片格式、SVG 默认尺寸、`--topng`、`--nobin`、`--pngquant`、输出资源名或图片构建故障 → [Lite 图片转换器](references/img-converter.md)
 
 ### ViewModel 与样式特性
 

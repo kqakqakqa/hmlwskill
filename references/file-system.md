@@ -52,7 +52,7 @@ internal://app/                 # 应用沙盒（@system.file 可访问）
 `common` 位于应用资源根（编译前 `app.js` 所在目录，见 [真机目录模型](#真机目录模型)）。同样地，只能通过 HML/CSS/JS 静态引用访问，`@system.file` 无法读写。
 
 `common` 通常约定为资源放置位置：
-- 页面图片、动画帧放在项目的 `entry/src/main/js/<Ability>/common/` 或其子目录。
+- 页面图片、动画帧放在项目的 `entry/src/main/js/<Ability>/common/` 或其子目录。图片格式、`.bin` 生成、构建前参数文件名和最终资源名转换规则见 [img-converter.md](img-converter.md)。
 - HML 和 JS 数据中的媒体路径写为编译后的资源路径，例如 `/common/img/icon.png`。
 - CSS 引用使用相对路径 `@import '../../common/style.css'`。
 - 公共 JS 代码放在 `common`，从页面使用相对路径导入，例如 `../../common/utils.js`。**不要用 `/common/utils.js` 作为代码导入路径**。
@@ -109,6 +109,7 @@ import utils from '../../common/utils.js';
 - `common`、`rawfile` 内图片路径的子目录也只使用英文字母、数字、`_`、`-`。项目所在的 Windows 上级目录可以是中文，不受此规则影响。
 - 文件名、目录名和引用路径大小写完全一致。
 - 禁止中文、空格、全角符号、emoji 和其他非 ASCII 图片名称；重命名时同步修改所有 HML、CSS、JS 和配置引用。
+- 图片转换器的构建前源文件可临时使用 ASCII 空格分隔 `--topng`、`--nobin`、`--pngquant <number>` 参数；这类文件不得被页面代码引用，且构建后必须产出符合本节规则的无参数最终资源名。完整参数和输出规则见 [img-converter.md](img-converter.md#文件名参数)。
 - 任一非法名称都属于发布阻塞项，不能以 Windows 或预览器偶尔能显示为放行依据。
 
 ## 选择规则
@@ -143,3 +144,4 @@ import utils from '../../common/utils.js';
 - 音频复制与播放流程：[system.md](system.md#音频播放)
 - 编译、签名与真机验证：[build-sign.md](build-sign.md)
 - 只读评审脚本的资源检查项：[project-reviewer.md](project-reviewer.md) 的"资源布局与路径"
+- Lite 图片格式、`.bin`、SVG 和图片构建参数：[img-converter.md](img-converter.md)

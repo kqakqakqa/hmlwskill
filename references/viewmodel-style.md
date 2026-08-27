@@ -13,6 +13,7 @@
   - [公共属性与渲染指令](#公共属性与渲染指令)
   - [标签专属属性](#标签专属属性)
   - [事件写法](#事件写法)
+    - [表冠旋转与列表滚动](#表冠旋转与列表滚动)
   - [父子结构](#父子结构)
   - [HML 表达式](#hml-表达式)
   - [限制](#限制)
@@ -161,6 +162,28 @@ click longpress touchstart touchmove touchcancel touchend key swipe
 - `qrcode`: 仅 `click`、`longpress`、`swipe`
 - `picker-view`: 仅 `change`
 
+### 表冠旋转与列表滚动
+
+Lite Wearable 可将表冠旋转焦点绑定到可滚动的 `list`。给 `list` 设置 `ref="bindRotation"`（或其他任意名字），页面显示时调用 `this.$refs.bindRotation.rotation({ focus: true })`，页面隐藏时调用 `this.$refs.bindRotation.rotation({ focus: false })`。
+
+```hml
+<list ref="bindRotation" on:swipe="swipeBack">
+  ...
+</list>
+```
+
+```javascript
+onShow() {
+  if (this.$refs.bindRotation.rotation) this.$refs.bindRotation.rotation({ focus: true });
+},
+
+onHide() {
+  if (this.$refs.bindRotation.rotation) this.$refs.bindRotation.rotation({ focus: false });
+}
+```
+
+该绑定只用于需要表冠滚动的页面，离开页面时必须关闭 focus，避免焦点残留到其他页面。具体旋转步长和真机滚动手感以目标设备为准。
+
 绑定形式包括 `@click`、`onclick`、`on:click`、`grab:click`，以及 SDK 接受的 `.bubble`/`.capture` 修饰。回调名和传参必须使用 HML 表达式可接受的 ES5 形式，不能在属性中写箭头函数。
 
 事件冒泡机制**从 API 5 开始**；面向更低 API 时不得依赖它。`@click`、`onclick` 属于旧写法，按事件冒泡进行处理。为了避免业务逻辑错误，建议将旧写法（如 `onclick`）改成新写法（`grab:click`）。
@@ -241,8 +264,9 @@ click longpress touchstart touchmove touchcancel touchend key swipe
 - `<text>` 是唯一自动计算高度的元素。
 - 未设置宽度默认一行。
 - 字体/元素宽高不可获取，文字布局要手动计算。
-- 在 API<10 版本，`font-size` 支持最好的是 `30px` 和 `36px`，其余支持有限。
+- 在 API<10 版本，`font-size` 支持最好的是 `30px` 和 `38px`，其余支持有限。
 - 在 API≥10 版本，`font-size` 广泛支持；emoji 支持有限。
+- 文本框高度：单行 = `字号 × 1.25`；多行 = `字号 × 1.25 + (行数 - 1) × 字号 × 1.375`。相邻两行间距 = `字号 × (1.375 - 1.25)`。
 
 ## AI 生成规则
 

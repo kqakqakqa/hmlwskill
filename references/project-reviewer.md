@@ -41,7 +41,7 @@ scripts\project-reviewer\run-reviewer.bat -ProjectPath <应用目录> -TargetHea
 2. **源码清单**：统计 JS/HML/样式/图片/音频文件与字节数；rawfile 下的 JS 工具文件不参与运行时扫描；标注大体积 JS。
 3. **JS 源码语法**（语法白名单见 [js-syntax.md](js-syntax.md)）：
    - 允许（INFO）：let/const、箭头函数、class、for...of、模板字符串、静态 import/export（Lite ES6 子集，仍需核对 heap 与构建产物）。
-   - 禁止（WARN）：async/await、生成器/yield、spread、可选链、空值合并、动态 import、BigInt、eval/Function、QuickJS 嵌入；Promise/Map/Set 等内建对象需 SDK/构建/真机证明；CommonJS/Node 风格（require/Buffer/process）。
+   - 禁止（WARN）：async/await、生成器/yield、spread、动态 import、BigInt、QuickJS 嵌入；Promise/Map/Set 等内建对象需 SDK/构建/真机证明；CommonJS/Node 风格（require/Buffer/process）。
    - 定时器/订阅：统计创建与清理次数，无清理时告警。
 4. **构建产物 JS**（提供 `-BuiltJsPath` 时）：对转译后产物重复上述语法检查，确认不含未转译的高成本语法；产物单个 JS 文件不得大于 48 KiB（见 [js-syntax.md](js-syntax.md#import-与产物大小)）（产物检查清单见 [js-syntax.md](js-syntax.md#构建产物检查)）。
 5. **平台 API 声明**：提取 `@system/@ohos/@kit` import，对照 SDK `*.d.ts` 的 `@since`/`@deprecated`，标记高于目标 API 的用法与废弃项（版本特性核对见 [build-sign.md](build-sign.md#sdk-api-兼容性核对)）。
